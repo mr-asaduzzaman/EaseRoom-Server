@@ -39,8 +39,13 @@ async function run() {
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
 
-        // All Rooms Apis get data
+        //Collections
         const EaseRoom = client.db('EaseRoom').collection('Rooms')
+        const BookedRoomsCollection= client.db('EaseRoom').collection('BookedRooms')
+
+
+
+        // Get all rooms data
         app.get('/Rooms', async (req, res) => {
             const cursor = EaseRoom.find();
             const result = await cursor.toArray();
@@ -48,7 +53,7 @@ async function run() {
         })
         
 
-        // Single Room data
+        // Get single Room data
         app.get('/Rooms/:id', async(req, res) => {
             const id = req.params.id
             const query = {_id: new ObjectId(id)}
@@ -57,6 +62,21 @@ async function run() {
         })
 
 
+        // Post Booked Rooms
+        app.post('/BookedRooms', async (req, res) => {
+            const application = req.body;
+            const result = await BookedRoomsCollection.insertOne(application)
+            res.send(result)
+        })
+
+
+        app.get('/BookedRooms', async (req, res) => {
+            const email = req.query.email;
+            const query = {user_email : email }
+            const result = await BookedRoomsCollection.find(query).toArray();
+            res.send(result)
+        })
+        
 
         // Ensures that the client will close when you finish/error
         // await client.close();
