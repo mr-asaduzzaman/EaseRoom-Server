@@ -20,7 +20,9 @@ app.get('/', (req, res) => {
     res.send('EaseRoom server is running properly...!!');
 });
 
-
+app.listen(port, () => {
+    console.log(`EaseRoom server is running at: ${port}`);
+});
 
 // MongoDB connection
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.diruq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
