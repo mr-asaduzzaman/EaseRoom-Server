@@ -6,8 +6,8 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
+
+
 app.use(express.json());
 
 app.get('/', (req, res) => {
@@ -34,7 +34,7 @@ async function run() {
     try {
         // Connect the client to the server
         await client.connect();
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
         // Collections
         const EaseRoom = client.db('EaseRoom').collection('Rooms');
@@ -120,7 +120,7 @@ async function run() {
                 }
             } catch (error) {
                 console.error('Error submitting review:', error);
-                res.status(500).send({ message: 'An error occurred while submitting the review.' });
+                res.status(500).send({ message: 'Error occurred while submitting the review.' });
             }
         });
 
