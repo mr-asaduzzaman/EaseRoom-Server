@@ -7,13 +7,17 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({ origin: [
-    'http://localhost:5174',
-    'https://ease-room.web.app',
-    'https://ease-room.firebaseapp.com',
-] }));
-
-
+app.use(
+    cors({
+        origin: [
+            'http://localhost:5175',  // Your local frontend
+            'https://ease-room.web.app', // Your production frontend (if any)
+            'https://ease-room.firebaseapp.com', // Your production frontend (if any)
+        ],
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], // Allow specific methods
+        allowedHeaders: ['Content-Type', 'Authorization'], // Allow specific headers
+    })
+);
 app.use(express.json());
 
 app.get('/', (req, res) => {
@@ -27,7 +31,6 @@ app.listen(port, () => {
 // MongoDB connection
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.diruq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
@@ -38,111 +41,115 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        // Connect the client to the server
-        await client.connect();
-        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        await client.connect();  // Establish MongoDB connection
 
         // Collections
         const EaseRoom = client.db('EaseRoom').collection('Rooms');
         const BookedRoomsCollection = client.db('EaseRoom').collection('BookedRooms');
-        const ReviewsCollection = client.db('EaseRoom').collection('Reviews'); // New reviews collection
+        const ReviewsCollection = client.db('EaseRoom').collection('Reviews');
 
         // Get all rooms data
         app.get('/Rooms', async (req, res) => {
-            const cursor = EaseRoom.find();
-            const result = await cursor.toArray();
-            res.send(result);
+            try {
+                const result = await EaseRoom.find().toArray();
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ message: 'Error fetching rooms', error });
+            }
         });
 
         // Get single room data
         app.get('/Rooms/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { _id: new ObjectId(id) };
-            const result = await EaseRoom.findOne(query);
-            res.send(result);
+            try {
+                const result = await EaseRoom.findOne({ _id: new ObjectId(id) });
+                if (result) {
+                    res.send(result);
+                } else {
+                    res.status(404).send({ message: 'Room not found' });
+                }
+            } catch (error) {
+                res.status(500).send({ message: 'Error fetching room', error });
+            }
         });
 
-        // Post booked rooms
+        // Booked rooms endpoints
         app.post('/BookedRooms', async (req, res) => {
-            const application = req.body;
-            const result = await BookedRoomsCollection.insertOne(application);
-            res.send(result);
+            try {
+                const result = await BookedRoomsCollection.insertOne(req.body);
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ message: 'Error booking room', error });
+            }
         });
 
-        // Get booked rooms (with optional filtering by email)
         app.get('/BookedRooms', async (req, res) => {
             const email = req.query.email;
-            let query = {};
-            if (email) {
-                query = { user_email: email };
+            const query = email ? { user_email: email } : {};
+            try {
+                const result = await BookedRoomsCollection.find(query).toArray();
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ message: 'Error fetching bookings', error });
             }
-            const result = await BookedRoomsCollection.find(query).toArray();
-            res.send(result);
         });
 
-        // Delete booked room
         app.delete('/BookedRooms/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { _id: new ObjectId(id) };
-            const result = await BookedRoomsCollection.deleteOne(query);
-            res.send(result);
+            try {
+                const result = await BookedRoomsCollection.deleteOne({ _id: new ObjectId(id) });
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ message: 'Error deleting booking', error });
+            }
         });
 
-        // Update booking date
         app.patch('/BookedRooms/:id', async (req, res) => {
             const id = req.params.id;
             const { bookingDate } = req.body;
-
             try {
-                const filter = { _id: new ObjectId(id) };
-                const updateDoc = {
-                    $set: {
-                        bookingDate: bookingDate,
-                    },
-                };
-
-                const result = await BookedRoomsCollection.updateOne(filter, updateDoc);
-
-                if (result.modifiedCount > 0) {
-                    res.status(200).send({ modifiedCount: result.modifiedCount, message: 'Booking date updated successfully.' });
-                } else {
-                    res.status(400).send({ modifiedCount: result.modifiedCount, message: 'No changes were made.' });
-                }
+                const result = await BookedRoomsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: { bookingDate } }
+                );
+                res.send(result);
             } catch (error) {
-                console.error('Error updating booking date:', error);
-                res.status(500).send({ error: 'An error occurred while updating the booking date.' });
+                res.status(500).send({ message: 'Error updating booking date', error });
             }
         });
 
-        // Add a review
+        // Reviews endpoints
         app.post('/reviews', async (req, res) => {
-            const reviewPayload = req.body;
             try {
-                const result = await ReviewsCollection.insertOne(reviewPayload);
-                if (result.insertedId) {
-                    res.status(201).send({ insertedId: result.insertedId });
-                } else {
-                    res.status(400).send({ message: 'Failed to submit the review.' });
-                }
+                const result = await ReviewsCollection.insertOne(req.body);
+                res.send(result);
             } catch (error) {
-                console.error('Error submitting review:', error);
-                res.status(500).send({ message: 'Error occurred while submitting the review.' });
+                res.status(500).send({ message: 'Error submitting review', error });
             }
         });
 
         app.get('/reviews', async (req, res) => {
-            const cursor = ReviewsCollection.find();
-            const result = await cursor.toArray();
-            res.send(result);
+            try {
+                const result = await ReviewsCollection.find().toArray();
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ message: 'Error fetching reviews', error });
+            }
         });
 
         app.get('/Reviews/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { _id: new ObjectId(id) };
-            const result = await ReviewsCollection.find(query).toArray()
-            res.send(result);
+            try {
+                const result = await ReviewsCollection.findOne({ _id: new ObjectId(id) });
+                if (result) {
+                    res.send(result);
+                } else {
+                    res.status(404).send({ message: 'Review not found' });
+                }
+            } catch (error) {
+                res.status(500).send({ message: 'Error fetching review', error });
+            }
         });
-
     } catch (error) {
         console.error('Error connecting to MongoDB:', error);
     }
